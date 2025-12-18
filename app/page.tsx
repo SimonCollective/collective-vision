@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { calculateFinancialRisk } from './riskCalculator';
 import { scanDomain } from './actions';
 
-// Define the shape of our "Fix" object so TypeScript is happy
+// Define the shape of our "Fix" object
 interface FixData {
   title: string;
   type: string;
@@ -29,12 +29,16 @@ export default function Home() {
 
   // State for the "Fix It" Modal
   const [selectedFix, setSelectedFix] = useState<FixData | null>(null);
+  
+  // NEW: State to track if the copy button was clicked
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const handleScan = async () => {
     if (!domain) return;
     setLoading(true);
     setShowResults(false);
     setSelectedFix(null);
+    setCopySuccess(false);
 
     const result = await scanDomain(domain);
     const loss = calculateFinancialRisk(industry, employees, result.score);
@@ -48,14 +52,23 @@ export default function Home() {
     setShowResults(true);
   };
 
+  // Logic to copy text and show the "Copied!" feedback
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(true);
+    // Reset back to "Copy" after 2 seconds
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
   // LOGIC: Generate the DNS records WITH GUIDANCE
   const generateFix = (issue: string) => {
+    setCopySuccess(false); // Reset copy state when opening a new fix
+    
     // 1. DMARC FIX
     if (issue.includes("DMARC")) {
       setSelectedFix({
         title: "DMARC Implementation Guide",
         type: "TXT Record",
-        // We use admin@domain as a placeholder
         code: `Host: _dmarc\nValue: v=DMARC1; p=none; rua=mailto:admin@${domain}`,
         explanation: "This record puts your email domain into 'Monitoring Mode'. It does not block any emails yet (so it is safe to install), but it will start sending you reports on who is sending email as your company.",
         steps: [
@@ -299,15 +312,23 @@ export default function Home() {
                             <p className="text-xs font-bold text-slate-500 uppercase mb-2">Configuration Record</p>
                             <div className="bg-slate-950 p-4 rounded-lg border border-slate-700 font-mono text-sm text-emerald-300 break-all relative group">
                                 {selectedFix.code}
+                                
+                                {/* NEW COPY BUTTON: 
+                                  Changes color and text based on 'copySuccess' state 
+                                */}
                                 <button 
-                                    onClick={() => navigator.clipboard.writeText(selectedFix.code)}
-                                    className="absolute top-2 right-2 bg-slate-800 text-xs text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition border border-slate-600"
+                                    onClick={() => handleCopy(selectedFix.code)}
+                                    className={`absolute top-2 right-2 text-xs px-2 py-1 rounded transition font-bold border ${
+                                        copySuccess 
+                                        ? "bg-emerald-500 text-white border-emerald-500" 
+                                        : "bg-slate-800 text-white border-slate-600 opacity-0 group-hover:opacity-100"
+                                    }`}
                                 >
-                                    Copy
+                                    {copySuccess ? "Copied! ✓" : "Copy"}
                                 </button>
                             </div>
                             
-                            {/* DMARC WARNING: Tells user to update the email */}
+                            {/* DMARC WARNING */}
                             {selectedFix.title.includes("DMARC") && (
                                 <p className="text-xs text-yellow-500 mt-2">
                                     ⚠ <strong>Action Required:</strong> The code above sends reports to <strong>admin@{domain}</strong>. Please change this to a valid IT email address before saving.
