@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { calculateFinancialRisk } from './riskCalculator';
 import { scanDomain } from './actions';
 
-// Define the shape of our "Fix" object
 interface FixData {
   title: string;
   type: string;
@@ -21,16 +20,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   
-  // State for metrics
   const [riskScore, setRiskScore] = useState(0);
   const [financialLoss, setFinancialLoss] = useState(0);
   const [issues, setIssues] = useState<string[]>([]);
   const [passes, setPasses] = useState<string[]>([]);
 
-  // State for the "Fix It" Modal
   const [selectedFix, setSelectedFix] = useState<FixData | null>(null);
-  
-  // NEW: State to track if the copy button was clicked
   const [copySuccess, setCopySuccess] = useState(false);
 
   const handleScan = async () => {
@@ -52,19 +47,14 @@ export default function Home() {
     setShowResults(true);
   };
 
-  // Logic to copy text and show the "Copied!" feedback
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopySuccess(true);
-    // Reset back to "Copy" after 2 seconds
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  // LOGIC: Generate the DNS records WITH GUIDANCE
   const generateFix = (issue: string) => {
-    setCopySuccess(false); // Reset copy state when opening a new fix
-    
-    // 1. DMARC FIX
+    setCopySuccess(false);
     if (issue.includes("DMARC")) {
       setSelectedFix({
         title: "DMARC Implementation Guide",
@@ -82,7 +72,6 @@ export default function Home() {
         ]
       });
     }
-    // 2. SPF FIX
     else if (issue.includes("SPF")) {
       setSelectedFix({
         title: "SPF Record Template",
@@ -107,7 +96,9 @@ export default function Home() {
       {/* Top Navigation Bar */}
       <nav className="border-b border-slate-700 bg-slate-950 p-4">
         <div className="max-w-6xl mx-auto relative flex items-center justify-between h-16">
-          <div className="relative h-16 w-48 shrink-0">
+          
+          {/* Left: Logo */}
+          <div className="relative h-16 w-32 md:w-48 shrink-0">
              <Image 
                src="/logo.png" 
                alt="Collective Security Logo"
@@ -116,21 +107,33 @@ export default function Home() {
                priority
              />
           </div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+
+          {/* Center: Title (HIDDEN ON MOBILE to prevent overlap) */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center hidden md:block">
             <h1 className="text-2xl md:text-3xl font-bold tracking-widest uppercase whitespace-nowrap">
               COLLECTIVE <span className="text-emerald-400">VISION</span>
             </h1>
           </div>
-          <span className="hidden md:block text-xs font-mono text-slate-500 uppercase tracking-widest">
-            Prospect Intelligence
-          </span>
+
+          {/* Right: Export Button (Visible only when results exist) */}
+          {showResults && (
+            <button 
+              onClick={() => window.print()}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 px-4 py-2 rounded flex items-center gap-2 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span className="hidden sm:inline">Export PDF</span>
+            </button>
+          )}
         </div>
       </nav>
 
       <div className="max-w-4xl mx-auto p-8">
         
         {/* Input Card */}
-        <div className="bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700 mb-8">
+        <div className="bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700 mb-8 input-card">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="col-span-1 md:col-span-3">
               <label className="block text-xs font-bold text-emerald-400 uppercase mb-2 tracking-wider">Target Domain</label>
@@ -313,9 +316,7 @@ export default function Home() {
                             <div className="bg-slate-950 p-4 rounded-lg border border-slate-700 font-mono text-sm text-emerald-300 break-all relative group">
                                 {selectedFix.code}
                                 
-                                {/* NEW COPY BUTTON: 
-                                  Changes color and text based on 'copySuccess' state 
-                                */}
+                                {/* NEW COPY BUTTON */}
                                 <button 
                                     onClick={() => handleCopy(selectedFix.code)}
                                     className={`absolute top-2 right-2 text-xs px-2 py-1 rounded transition font-bold border ${
@@ -334,8 +335,8 @@ export default function Home() {
                                     ⚠ <strong>Action Required:</strong> The code above sends reports to <strong>admin@{domain}</strong>. Please change this to a valid IT email address before saving.
                                 </p>
                             )}
-
-                            {/* SPF WARNING */}
+                            
+                             {/* SPF WARNING */}
                             {selectedFix.title.includes("SPF") && (
                                 <p className="text-xs text-yellow-500 mt-2">
                                     ⚠ Note: This is a standard template. Ensure you add any other email services (like Mailchimp or HubSpot) the client uses before saving.
