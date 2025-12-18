@@ -1,16 +1,73 @@
-// app/actions.ts
 "use server";
 
 import dns from 'dns/promises';
+import tls from 'tls';
+
+// Helper: Check SSL Details
+async function getSSLDetails(domain: string) {
+  return new Promise<{ daysRemaining: number, valid: boolean, issuer: string } | null>((resolve) => {
+    try {
+      const socket = tls.connect({
+        host: domain,
+        port: 443,
+        servername: domain, // SNI: Required for modern hosting
+        rejectUnauthorized: false, // We want to see the cert even if it's expired
+        timeout: 3000 // 3 second timeout
+      }, () => {
+        const cert = socket.getPeerCertificate();
+        if (!cert || Object.keys(cert).length === 0) {
+          socket.end();
+          resolve(null);
+          return;
+        }
+        
+        const validTo = new Date(cert.valid_to);
+        const daysRemaining = Math.floor((validTo.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        
+        socket.end();
+        resolve({
+          daysRemaining,
+          valid: daysRemaining > 0,
+          issuer: cert.issuer.O || "Unknown Issuer"
+        });
+      });
+
+      socket.on('error', () => resolve(null));
+      socket.on('timeout', () => { socket.destroy(); resolve(null); });
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
 
 export async function scanDomain(domain: string) {
+  // 1. Clean the domain
   const cleanDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
   
   let score = 100;
   const issues: string[] = [];
   const passes: string[] = [];
 
-  // --- PART 1: EMAIL SECURITY (DNS) ---
+  // --- PART 1: SSL CERTIFICATE CHECK (NEW) ---
+  const sslData = await getSSLDetails(cleanDomain);
+  
+  if (sslData) {
+    if (!sslData.valid) {
+      score -= 20;
+      issues.push(`SSL Certificate has EXPIRED (Critical Security Risk)`);
+    } else if (sslData.daysRemaining < 14) {
+      score -= 10;
+      issues.push(`SSL Expires soon (${sslData.daysRemaining} days remaining) - Renew Immediately`);
+    } else {
+      passes.push(`SSL Certificate Valid (${sslData.daysRemaining} days remaining)`);
+    }
+  } else {
+    // If we can't connect via SSL at all
+    score -= 20;
+    issues.push("No SSL/TLS Certificate found (Not Secure)");
+  }
+
+  // --- PART 2: EMAIL SECURITY (DNS) ---
   try {
     const txtRecords = await dns.resolveTxt(cleanDomain).catch(() => []);
     
@@ -42,12 +99,12 @@ export async function scanDomain(domain: string) {
     issues.push("DNS Lookup failed");
   }
 
-  // --- PART 2: WEB SECURITY (Headers & SSL) ---
+  // --- PART 3: WEB SECURITY (Headers) ---
   try {
     const response = await fetch(`https://${cleanDomain}`, { 
       method: 'GET',
       redirect: 'follow',
-      cache: 'no-store', // <--- This ensures every scan is fresh
+      cache: 'no-store',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
@@ -82,8 +139,8 @@ export async function scanDomain(domain: string) {
     }
 
   } catch (error) {
-    // We only penalize slightly here as some sites just block scanners
-    issues.push("Could not scan Website Headers (Site may be blocking bots)");
+    // If fetch failed but SSL Check (Part 1) worked, it might just be a 403/404 error, which is fine.
+    // If SSL check also failed, we already deducted points there.
   }
 
   return { 
