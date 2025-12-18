@@ -12,6 +12,17 @@ interface FixData {
   steps: string[];
 }
 
+// 1. Advice Database for CMS Platforms
+const cmsAdvice: Record<string, string> = {
+  "WordPress": "WordPress is the most targeted CMS in the world. Ensure you are using a security plugin (like Wordfence), change the default 'admin' username, and keep all plugins auto-updated.",
+  "Shopify": "Shopify is generally secure, but risk lies in third-party apps. Audit your installed apps regularly and ensure Two-Factor Authentication (2FA) is enforced for all staff accounts.",
+  "Wix": "Wix manages most security for you, but you are vulnerable to social engineering. Ensure your domain DNS is locked and 2FA is active on your Wix account.",
+  "Squarespace": "Squarespace is a closed ecosystem. Your main risk is weak passwords. Enforce strong password policies for all contributors and limit permissions.",
+  "Joomla": "Joomla requires strict maintenance. Rename your 'htaccess.txt' to '.htaccess' to activate built-in firewall rules and remove unused extensions immediately.",
+  "Drupal": "Drupal is powerful but complex. Ensure you are subscribed to Drupal Security Advisories and apply core security patches within hours of release.",
+  "Unknown": "We could not identify a specific CMS. This often means a custom build, which requires a manual code audit to ensure no hidden vulnerabilities exist."
+};
+
 export default function Home() {
   const [domain, setDomain] = useState('');
   const [industry, setIndustry] = useState('marketing');
@@ -24,6 +35,7 @@ export default function Home() {
   const [financialLoss, setFinancialLoss] = useState(0);
   const [issues, setIssues] = useState<string[]>([]);
   const [passes, setPasses] = useState<string[]>([]);
+  const [detectedCMS, setDetectedCMS] = useState<string | null>(null);
 
   const [selectedFix, setSelectedFix] = useState<FixData | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -42,6 +54,7 @@ export default function Home() {
     setFinancialLoss(loss);
     setIssues(result.issues);
     setPasses(result.passes);
+    setDetectedCMS(result.cms);
     
     setLoading(false);
     setShowResults(true);
@@ -62,12 +75,12 @@ export default function Home() {
         code: `Host: _dmarc\nValue: v=DMARC1; p=none; rua=mailto:admin@${domain}`,
         explanation: "This record puts your email domain into 'Monitoring Mode'. It does not block any emails yet (so it is safe to install), but it will start sending you reports on who is sending email as your company.",
         steps: [
-            "Log in to your DNS Provider (e.g., GoDaddy, Cloudflare, Namecheap).",
-            "Go to 'DNS Management' or 'Name Server Settings'.",
+            "Log in to your DNS Provider.",
+            "Go to 'DNS Management'.",
             "Add a new record: Select 'TXT' as the type.",
             "Paste '_dmarc' into the Host/Name field.",
             "Paste the code below into the Value/Content field.",
-            "⚠ IMPORTANT: Change 'admin@...' to the actual IT email address where you want to receive security reports.",
+            "⚠ IMPORTANT: Change 'admin@...' to the actual IT email address.",
             "Save. Changes can take up to 48 hours to propagate."
         ]
       });
@@ -77,14 +90,14 @@ export default function Home() {
         title: "SPF Record Template",
         type: "TXT Record",
         code: `Host: @\nValue: v=spf1 include:_spf.google.com include:spf.protection.outlook.com ~all`,
-        explanation: "An SPF record is like an ID card for your email. It lists exactly which services are allowed to send email for you. This template authorizes Google and Outlook, which covers 90% of businesses.",
+        explanation: "This template lists exactly which services are allowed to send email for you. This template authorizes Google and Outlook.",
         steps: [
             "Log in to your DNS Provider.",
             "Go to 'DNS Management'.",
             "Add a new record: Select 'TXT' as the type.",
-            "Type '@' into the Host/Name field (or leave it blank if required).",
+            "Type '@' into the Host/Name field.",
             "Paste the code below into the Value field.",
-            "⚠ IMPORTANT: If you use Mailchimp, HubSpot, or other tools, ask your IT team to add them to this list before saving."
+            "⚠ IMPORTANT: If you use Mailchimp or HubSpot, ask IT to add them to this list."
         ]
       });
     }
@@ -93,37 +106,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
       
-      {/* Top Navigation Bar */}
+      {/* Top Navigation */}
       <nav className="border-b border-slate-700 bg-slate-950 p-4">
         <div className="max-w-6xl mx-auto relative flex items-center justify-between h-16">
-          
-          {/* Left: Logo */}
           <div className="relative h-16 w-32 md:w-48 shrink-0">
-             <Image 
-               src="/logo.png" 
-               alt="Collective Security Logo"
-               fill
-               className="object-contain object-left"
-               priority
-             />
+             <Image src="/logo.png" alt="Collective Security Logo" fill className="object-contain object-left" priority />
           </div>
-
-          {/* Center: Title (HIDDEN ON MOBILE to prevent overlap) */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center hidden md:block">
             <h1 className="text-2xl md:text-3xl font-bold tracking-widest uppercase whitespace-nowrap">
               COLLECTIVE <span className="text-emerald-400">VISION</span>
             </h1>
           </div>
-
-          {/* Right: Export Button (Visible only when results exist) */}
           {showResults && (
-            <button 
-              onClick={() => window.print()}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 px-4 py-2 rounded flex items-center gap-2 transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+            <button onClick={() => window.print()} className="text-xs bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 px-4 py-2 rounded flex items-center gap-2 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               <span className="hidden sm:inline">Export PDF</span>
             </button>
           )}
@@ -137,21 +133,11 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="col-span-1 md:col-span-3">
               <label className="block text-xs font-bold text-emerald-400 uppercase mb-2 tracking-wider">Target Domain</label>
-              <input 
-                type="text" 
-                placeholder="company.com" 
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-              />
+              <input type="text" placeholder="company.com" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition" value={domain} onChange={(e) => setDomain(e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Industry Sector</label>
-              <select 
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-              >
+              <select className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" value={industry} onChange={(e) => setIndustry(e.target.value)}>
                 <option value="marketing">Marketing & Advertising</option>
                 <option value="finance">Finance & Legal</option>
                 <option value="retail">Retail & E-commerce</option>
@@ -161,22 +147,14 @@ export default function Home() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Company Size</label>
-              <select 
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                value={employees}
-                onChange={(e) => setEmployees(Number(e.target.value))}
-              >
+              <select className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" value={employees} onChange={(e) => setEmployees(Number(e.target.value))}>
                 <option value="5">1 - 10 Employees</option>
                 <option value="25">11 - 50 Employees</option>
                 <option value="100">50+ Employees</option>
               </select>
             </div>
             <div className="flex items-end">
-              <button 
-                onClick={handleScan}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3 rounded-lg shadow-lg transform active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button onClick={handleScan} disabled={loading} className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3 rounded-lg shadow-lg transform active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                 {loading ? "Initializing Scanner..." : "RUN DIAGNOSTIC"}
               </button>
             </div>
@@ -221,31 +199,29 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Card 3: Dark Web Teaser */}
+              {/* Card 3: Technology Intelligence (CMS) */}
               <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-between relative">
-                <div className="absolute top-4 right-4 text-slate-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
                 <div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Dark Web Surveillance</p>
-                  <p className="text-lg font-semibold text-white">Credential Check</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Technology Intelligence</p>
+                  <p className="text-xl font-bold text-white mb-1">
+                    {detectedCMS ? detectedCMS : "Unknown Platform"}
+                  </p>
+                  <div className="w-full h-1 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                    <div className="h-full bg-blue-500 w-2/3"></div>
+                  </div>
                 </div>
-                <div className="mt-4 bg-slate-900/50 rounded p-3 border border-slate-700/50">
-                  <p className="text-xs text-slate-400 mb-1">Status:</p>
-                  <p className="text-sm text-yellow-500 font-mono">⚠ PENDING AUTHENTICATION</p>
+                <div className="mt-4">
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {detectedCMS ? cmsAdvice[detectedCMS] : cmsAdvice["Unknown"]}
+                  </p>
                 </div>
-                <button className="mt-4 w-full text-xs bg-slate-700 hover:bg-slate-600 text-white py-2 rounded transition font-bold uppercase">
-                  Request Deep Scan
-                </button>
               </div>
             </div>
 
             {/* Detailed Findings Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Failed Checks (WITH FIX GENERATOR) */}
+              {/* Failed Checks */}
               {issues.length > 0 && (
                 <div className="bg-slate-800 rounded-xl border-l-4 border-red-500 p-6 shadow-lg">
                   <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -259,15 +235,9 @@ export default function Home() {
                             <span className="mt-1 w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></span>
                             <span className="text-sm text-red-200 font-medium">{issue}</span>
                         </div>
-                        
                         {(issue.includes("DMARC") || issue.includes("SPF")) && (
-                            <button 
-                                onClick={() => generateFix(issue)}
-                                className="ml-5 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-200 py-1 px-3 rounded border border-red-500/30 w-fit transition flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
+                            <button onClick={() => generateFix(issue)} className="ml-5 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-200 py-1 px-3 rounded border border-red-500/30 w-fit transition flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                 GENERATE DNS FIX
                             </button>
                         )}
@@ -298,7 +268,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* REMEDIATION BOX: Appears when "Generate Fix" is clicked */}
+            {/* REMEDIATION BOX */}
             {selectedFix && (
                 <div className="bg-slate-800 rounded-xl border border-slate-600 p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-2 scroll-mt-6" id="fix-box">
                     <div className="flex justify-between items-start mb-4 border-b border-slate-700 pb-4">
@@ -308,64 +278,31 @@ export default function Home() {
                         </div>
                         <button onClick={() => setSelectedFix(null)} className="text-slate-500 hover:text-white p-2">✕</button>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Left: The Code */}
                         <div>
                             <p className="text-xs font-bold text-slate-500 uppercase mb-2">Configuration Record</p>
                             <div className="bg-slate-950 p-4 rounded-lg border border-slate-700 font-mono text-sm text-emerald-300 break-all relative group">
                                 {selectedFix.code}
-                                
-                                {/* NEW COPY BUTTON */}
-                                <button 
-                                    onClick={() => handleCopy(selectedFix.code)}
-                                    className={`absolute top-2 right-2 text-xs px-2 py-1 rounded transition font-bold border ${
-                                        copySuccess 
-                                        ? "bg-emerald-500 text-white border-emerald-500" 
-                                        : "bg-slate-800 text-white border-slate-600 opacity-0 group-hover:opacity-100"
-                                    }`}
-                                >
+                                <button onClick={() => handleCopy(selectedFix.code)} className={`absolute top-2 right-2 text-xs px-2 py-1 rounded transition font-bold border ${copySuccess ? "bg-emerald-500 text-white border-emerald-500" : "bg-slate-800 text-white border-slate-600 opacity-0 group-hover:opacity-100"}`}>
                                     {copySuccess ? "Copied! ✓" : "Copy"}
                                 </button>
                             </div>
-                            
-                            {/* DMARC WARNING */}
-                            {selectedFix.title.includes("DMARC") && (
-                                <p className="text-xs text-yellow-500 mt-2">
-                                    ⚠ <strong>Action Required:</strong> The code above sends reports to <strong>admin@{domain}</strong>. Please change this to a valid IT email address before saving.
-                                </p>
-                            )}
-                            
-                             {/* SPF WARNING */}
-                            {selectedFix.title.includes("SPF") && (
-                                <p className="text-xs text-yellow-500 mt-2">
-                                    ⚠ Note: This is a standard template. Ensure you add any other email services (like Mailchimp or HubSpot) the client uses before saving.
-                                </p>
-                            )}
+                            {selectedFix.title.includes("DMARC") && <p className="text-xs text-yellow-500 mt-2">⚠ <strong>Action Required:</strong> Change <strong>admin@{domain}</strong> to a valid email.</p>}
+                            {selectedFix.title.includes("SPF") && <p className="text-xs text-yellow-500 mt-2">⚠ Note: Add any other email services (Mailchimp/HubSpot) before saving.</p>}
                         </div>
-
-                        {/* Right: The Steps */}
                         <div>
                             <p className="text-xs font-bold text-slate-500 uppercase mb-2">Implementation Steps</p>
-                            <ol className="list-decimal pl-4 space-y-2 text-sm text-slate-300">
-                                {selectedFix.steps.map((step, i) => (
-                                    <li key={i}>{step}</li>
-                                ))}
-                            </ol>
+                            <ol className="list-decimal pl-4 space-y-2 text-sm text-slate-300">{selectedFix.steps.map((step, i) => <li key={i}>{step}</li>)}</ol>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Call to Action Footer */}
+            {/* Footer */}
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-8 text-center">
               <h3 className="text-xl font-bold text-white mb-2">Full Security Audit Available</h3>
-              <p className="text-slate-400 text-sm max-w-2xl mx-auto mb-6">
-                This report represents a non-intrusive external scan. Deep inspection of endpoints, dark web credentials, and internal vulnerabilities requires authorization.
-              </p>
-              <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-emerald-500/20 transition">
-                Generate Full Client Report
-              </button>
+              <p className="text-slate-400 text-sm max-w-2xl mx-auto mb-6">This report represents a non-intrusive external scan. Deep inspection requires authorization.</p>
+              <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-emerald-500/20 transition">Generate Full Client Report</button>
             </div>
             
           </div>
