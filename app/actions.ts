@@ -2,17 +2,18 @@
 
 import dns from 'dns/promises';
 import tls from 'tls';
+import net from 'net';
 
-// Helper: Check SSL Details
+// Helper 1: Check SSL Details
 async function getSSLDetails(domain: string) {
   return new Promise<{ daysRemaining: number, valid: boolean, issuer: string } | null>((resolve) => {
     try {
       const socket = tls.connect({
         host: domain,
         port: 443,
-        servername: domain, // SNI: Required for modern hosting
-        rejectUnauthorized: false, // We want to see the cert even if it's expired
-        timeout: 3000 // 3 second timeout
+        servername: domain,
+        rejectUnauthorized: false,
+        timeout: 3000
       }, () => {
         const cert = socket.getPeerCertificate();
         if (!cert || Object.keys(cert).length === 0) {
@@ -40,6 +41,31 @@ async function getSSLDetails(domain: string) {
   });
 }
 
+// Helper 2: Check Single Port
+async function checkPort(domain: string, port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        socket.setTimeout(2500); // 2.5s timeout
+
+        socket.on('connect', () => {
+            socket.destroy();
+            resolve(true); // Connection SUCCESS means the port is OPEN (Bad news)
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false); // Timeout means firewall dropped it (Good news)
+        });
+
+        socket.on('error', () => {
+            socket.destroy();
+            resolve(false); // Connection refused (Good news)
+        });
+
+        socket.connect(port, domain);
+    });
+}
+
 export async function scanDomain(domain: string) {
   // 1. Clean the domain
   const cleanDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
@@ -48,7 +74,43 @@ export async function scanDomain(domain: string) {
   const issues: string[] = [];
   const passes: string[] = [];
 
-  // --- PART 1: SSL CERTIFICATE CHECK (NEW) ---
+  // --- PART 1: PORT SCANNING (NEW) ---
+  // We run these in parallel (Promise.all) so it doesn't slow down the app
+  const portsToCheck = [
+      { port: 21, service: "FTP (File Transfer)", risk: "High" },
+      { port: 22, service: "SSH (Admin Access)", risk: "Medium" },
+      { port: 3389, service: "RDP (Remote Desktop)", risk: "Critical" },
+      { port: 3306, service: "MySQL Database", risk: "Critical" },
+      { port: 5432, service: "PostgreSQL Database", risk: "Critical" },
+  ];
+
+  try {
+      const portResults = await Promise.all(
+          portsToCheck.map(async (target) => {
+              const isOpen = await checkPort(cleanDomain, target.port);
+              return { ...target, isOpen };
+          })
+      );
+
+      let openPortsFound = 0;
+
+      portResults.forEach(res => {
+          if (res.isOpen) {
+              openPortsFound++;
+              score -= (res.risk === "Critical" ? 20 : 10); // Deduct points
+              issues.push(`Open Port Detected: ${res.port} - ${res.service}`);
+          }
+      });
+
+      if (openPortsFound === 0) {
+          passes.push("Critical Ports (Database/RDP) are Closed/Firewalled");
+      }
+
+  } catch (error) {
+      // If port scan fails completely (rare), we just ignore it
+  }
+
+  // --- PART 2: SSL CERTIFICATE CHECK ---
   const sslData = await getSSLDetails(cleanDomain);
   
   if (sslData) {
@@ -62,12 +124,11 @@ export async function scanDomain(domain: string) {
       passes.push(`SSL Certificate Valid (${sslData.daysRemaining} days remaining)`);
     }
   } else {
-    // If we can't connect via SSL at all
     score -= 20;
     issues.push("No SSL/TLS Certificate found (Not Secure)");
   }
 
-  // --- PART 2: EMAIL SECURITY (DNS) ---
+  // --- PART 3: EMAIL SECURITY (DNS) ---
   try {
     const txtRecords = await dns.resolveTxt(cleanDomain).catch(() => []);
     
@@ -99,7 +160,7 @@ export async function scanDomain(domain: string) {
     issues.push("DNS Lookup failed");
   }
 
-  // --- PART 3: WEB SECURITY (Headers) ---
+  // --- PART 4: WEB SECURITY (Headers) ---
   try {
     const response = await fetch(`https://${cleanDomain}`, { 
       method: 'GET',
@@ -139,8 +200,7 @@ export async function scanDomain(domain: string) {
     }
 
   } catch (error) {
-    // If fetch failed but SSL Check (Part 1) worked, it might just be a 403/404 error, which is fine.
-    // If SSL check also failed, we already deducted points there.
+    // Silent fail for web headers if site is down
   }
 
   return { 
