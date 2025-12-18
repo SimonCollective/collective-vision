@@ -1,24 +1,36 @@
 "use client";
 import { useState } from 'react';
-// Note: The import path uses "@/utils" which points to your root folder
 import { calculateFinancialRisk } from './riskCalculator';
+import { scanDomain } from './actions'; // Import our new real scanner
 
 export default function Home() {
   const [domain, setDomain] = useState('');
   const [industry, setIndustry] = useState('marketing');
   const [employees, setEmployees] = useState(5);
   
+  const [loading, setLoading] = useState(false); // To show a "Scanning..." state
   const [showResults, setShowResults] = useState(false);
   const [riskScore, setRiskScore] = useState(0);
   const [financialLoss, setFinancialLoss] = useState(0);
+  const [issues, setIssues] = useState<string[]>([]);
 
-  const handleScan = () => {
-    // MOCK DATA: Simulating a result similar to your "Risk Report" PDF
-    const mockScore = 45; 
-    const loss = calculateFinancialRisk(industry, employees, mockScore);
+  const handleScan = async () => {
+    if (!domain) return;
     
-    setRiskScore(mockScore);
+    setLoading(true);
+    setShowResults(false);
+
+    // 1. RUN THE REAL SCAN
+    const result = await scanDomain(domain);
+    
+    // 2. Calculate Financial Impact based on REAL score
+    const loss = calculateFinancialRisk(industry, employees, result.score);
+    
+    setRiskScore(result.score);
     setFinancialLoss(loss);
+    setIssues(result.issues);
+    
+    setLoading(false);
     setShowResults(true);
   };
 
@@ -75,9 +87,10 @@ export default function Home() {
 
           <button 
             onClick={handleScan}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded transition"
+            disabled={loading}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-bold py-3 rounded transition"
           >
-            Generate Insights
+            {loading ? "Scanning External Surface..." : "Generate Insights"}
           </button>
         </div>
 
@@ -89,8 +102,12 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-white p-4 rounded shadow">
                 <p className="text-sm text-slate-500">Security Score</p>
-                <p className="text-3xl font-bold text-red-500">{riskScore}/100</p>
-                <p className="text-xs text-red-600 font-semibold mt-1">HIGH RISK</p>
+                <p className={`text-3xl font-bold ${riskScore < 70 ? 'text-red-500' : 'text-green-500'}`}>
+                  {riskScore}/100
+                </p>
+                <p className="text-xs font-semibold mt-1">
+                  {riskScore < 70 ? 'HIGH RISK' : 'SECURE'}
+                </p>
               </div>
               <div className="bg-white p-4 rounded shadow">
                 <p className="text-sm text-slate-500">Est. Financial Exposure</p>
@@ -99,11 +116,23 @@ export default function Home() {
               </div>
             </div>
 
+            {/* List of Real Issues */}
+            {issues.length > 0 && (
+              <div className="bg-white p-4 rounded shadow mb-4 border-l-4 border-red-500">
+                <h3 className="font-bold text-red-600 mb-2">Critical Vulnerabilities Detected:</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {issues.map((issue, index) => (
+                    <li key={index} className="text-sm text-slate-700">{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
               <p className="text-sm text-yellow-800">
                 <strong>Insight:</strong> Similar companies in {industry} face an average breach cost of 
                 <strong> £{(4500000).toLocaleString()}</strong>. 
-                Your current exposure is manageable but requires immediate attention.
+                Your current exposure requires attention.
               </p>
             </div>
           </div>
