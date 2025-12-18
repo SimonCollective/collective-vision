@@ -1,34 +1,33 @@
 "use client";
 import { useState } from 'react';
 import { calculateFinancialRisk } from './riskCalculator';
-import { scanDomain } from './actions'; // Import our new real scanner
+import { scanDomain } from './actions';
 
 export default function Home() {
   const [domain, setDomain] = useState('');
   const [industry, setIndustry] = useState('marketing');
   const [employees, setEmployees] = useState(5);
   
-  const [loading, setLoading] = useState(false); // To show a "Scanning..." state
+  const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  
   const [riskScore, setRiskScore] = useState(0);
   const [financialLoss, setFinancialLoss] = useState(0);
   const [issues, setIssues] = useState<string[]>([]);
+  const [passes, setPasses] = useState<string[]>([]); // New state for passing checks
 
   const handleScan = async () => {
     if (!domain) return;
-    
     setLoading(true);
     setShowResults(false);
 
-    // 1. RUN THE REAL SCAN
     const result = await scanDomain(domain);
-    
-    // 2. Calculate Financial Impact based on REAL score
     const loss = calculateFinancialRisk(industry, employees, result.score);
     
     setRiskScore(result.score);
     setFinancialLoss(loss);
     setIssues(result.issues);
+    setPasses(result.passes);
     
     setLoading(false);
     setShowResults(true);
@@ -88,7 +87,7 @@ export default function Home() {
           <button 
             onClick={handleScan}
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-bold py-3 rounded transition"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-400 text-white font-bold py-3 rounded transition"
           >
             {loading ? "Scanning External Surface..." : "Generate Insights"}
           </button>
@@ -97,8 +96,9 @@ export default function Home() {
         {/* Results Section */}
         {showResults && (
           <div className="bg-slate-100 p-6 border-t">
-            <h2 className="text-xl font-bold mb-4">Initial Findings for {domain}</h2>
+            <h2 className="text-xl font-bold mb-4">Findings for {domain}</h2>
             
+            {/* Score Cards */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-white p-4 rounded shadow">
                 <p className="text-sm text-slate-500">Security Score</p>
@@ -116,7 +116,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* List of Real Issues */}
+            {/* Red: Vulnerabilities */}
             {issues.length > 0 && (
               <div className="bg-white p-4 rounded shadow mb-4 border-l-4 border-red-500">
                 <h3 className="font-bold text-red-600 mb-2">Critical Vulnerabilities Detected:</h3>
@@ -128,11 +128,25 @@ export default function Home() {
               </div>
             )}
 
+            {/* Green: Secured Assets */}
+            {passes.length > 0 && (
+              <div className="bg-white p-4 rounded shadow mb-4 border-l-4 border-green-500">
+                <h3 className="font-bold text-green-600 mb-2">Secured Assets (Passed):</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {passes.map((pass, index) => (
+                    <li key={index} className="text-sm text-slate-700">{pass}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
               <p className="text-sm text-yellow-800">
                 <strong>Insight:</strong> Similar companies in {industry} face an average breach cost of 
                 <strong> £{(4500000).toLocaleString()}</strong>. 
-                Your current exposure requires attention.
+                {riskScore < 70 
+                  ? " Your current exposure requires immediate attention." 
+                  : " You are performing better than the industry average."}
               </p>
             </div>
           </div>
